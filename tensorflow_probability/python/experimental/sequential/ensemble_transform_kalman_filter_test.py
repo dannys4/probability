@@ -32,19 +32,19 @@ NUMPY_MODE = False
 
 
 @test_util.test_all_tf_execution_regimes
-class EnsembleKalmanFilterTest(test_util.TestCase):
+class EnsembleTransformKalmanFilterTest(test_util.TestCase):
 
-  def test_ensemble_kalman_filter_expect_mvn(self):
+  def test_ensemble_transform_kalman_filter_expect_mvn(self):
 
     state = tfs.EnsembleKalmanFilterState(step=0, particles=[1.], extra=None)
 
     with self.assertRaises(ValueError):
-      state = tfs.ensemble_kalman_filter_update(
+      state = tfs.ensemble_transform_kalman_filter_update(
           state,
           observation=[0.],
           observation_fn=lambda t, p, e: (tfd.Poisson(rate=p), e))
 
-  def test_ensemble_kalman_filter_constant_univariate_shapes(self):
+  def test_ensemble_transform_kalman_filter_constant_univariate_shapes(self):
     # Simple transition model where the state doesn't change,
     # so we are estimating a constant.
 
@@ -89,7 +89,7 @@ class EnsembleKalmanFilterTest(test_util.TestCase):
     # Check that the state respected the constant dynamics.
     self.assertAllClose(state.particles, predicted_state.particles)
 
-    updated_state = tfs.ensemble_kalman_filter_update(
+    updated_state = tfs.ensemble_transform_kalman_filter_update(
         predicted_state,
         # The observation is the constant 0.
         observation=observation,
@@ -152,7 +152,7 @@ class EnsembleKalmanFilterTest(test_util.TestCase):
       self.assertIn('transition_count', state.extra)
       self.assertEqual(i + 1, state.extra['transition_count'])
 
-      state = tfs.ensemble_kalman_filter_update(
+      state = tfs.ensemble_transform_kalman_filter_update(
           state,
           observation=[1. * i],
           observation_fn=observation_fn,
@@ -166,7 +166,7 @@ class EnsembleKalmanFilterTest(test_util.TestCase):
         self.evaluate(tf.reduce_mean(state.particles['x'], axis=[0, -1])),
         rtol=0.05)
 
-  def test_ensemble_kalman_filter_constant_model_multivariate(self):
+  def test_ensemble_transform_kalman_filter_constant_model_multivariate(self):
 
     def transition_fn(_, particles, extra):
       return tfd.MultivariateNormalDiag(
@@ -193,7 +193,7 @@ class EnsembleKalmanFilterTest(test_util.TestCase):
           seed=seed_stream(),
           inflate_fn=None)
 
-      state = tfs.ensemble_kalman_filter_update(
+      state = tfs.ensemble_transform_kalman_filter_update(
           state,
           observation=[0., 0.],
           observation_fn=observation_fn,
@@ -204,7 +204,7 @@ class EnsembleKalmanFilterTest(test_util.TestCase):
         self.evaluate(tf.reduce_mean(state.particles, axis=0)),
         atol=1e-2)
 
-  def test_ensemble_kalman_filter_linear_model_multivariate(self):
+  def test_ensemble_transform_kalman_filter_linear_model_multivariate(self):
 
     def transition_fn(_, particles, extra):
       particles = {
@@ -280,7 +280,7 @@ class EnsembleKalmanFilterTest(test_util.TestCase):
       self.assertEqual(3 * i + 2, state.extra['observation_count'])
 
       # Update.
-      state = tfs.ensemble_kalman_filter_update(
+      state = tfs.ensemble_transform_kalman_filter_update(
           state,
           observation=observation,
           observation_fn=observation_fn,
@@ -313,8 +313,8 @@ EnKFParams = collections.namedtuple(
 
 
 @test_util.test_all_tf_execution_regimes
-class KalmanFilterVersusEnKFTest(test_util.TestCase):
-  """Compare KF to EnKF with large ensemble sizes.
+class KalmanFilterVersusETKFTest(test_util.TestCase):
+  """Compare KF to ETKF with large ensemble sizes.
 
   If the model is linear and Gaussian the EnKF sample mean/cov and marginal
   likelihood converges to that of a KF in the large ensemble limit.
@@ -448,7 +448,7 @@ class KalmanFilterVersusEnKFTest(test_util.TestCase):
         transition_fn=transition_fn,
     )
 
-  def _enkf_solve(self, observation, enkf_params, predict_kwargs, update_kwargs,
+  def _etkf_solve(self, observation, enkf_params, predict_kwargs, update_kwargs,
                   log_marginal_likelihood_kwargs, seed_stream):
     """Solve one data assimilation step using an EnKF."""
     predicted_state = tfs.ensemble_kalman_filter_predict(
@@ -456,7 +456,7 @@ class KalmanFilterVersusEnKFTest(test_util.TestCase):
         enkf_params.transition_fn,
         seed=seed_stream(),
         **predict_kwargs)
-    updated_state = tfs.ensemble_kalman_filter_update(
+    updated_state = tfs.ensemble_transform_kalman_filter_update(
         predicted_state,
         observation,
         enkf_params.observation_fn,
@@ -486,7 +486,7 @@ class KalmanFilterVersusEnKFTest(test_util.TestCase):
           n_observations=[2, 5],
       ))
   def test_same_solution(self, noise_level, n_states, n_observations):
-    """Check that the KF and EnKF solutions are the same."""
+    """Check that the KF and ETKF solutions are the same."""
     # Tests pass with n_ensemble = 1e7. The KF vs. EnKF tolerance is
     # proportional to 1 / sqrt(n_ensemble), so this shows good agreement.
     n_ensemble = int(1e4) if NUMPY_MODE else int(1e6)
